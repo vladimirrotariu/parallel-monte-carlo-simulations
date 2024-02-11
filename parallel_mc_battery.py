@@ -2,6 +2,7 @@
 import time
 import logging
 import numpy as np
+from pydantic import BaseModel, validator
 
 import apache_beam as beam
 
@@ -49,5 +50,15 @@ class Parallel_MC_Battery:
                 
                 yield (monte_carlo_traces, output_path)
         
-
+            def __validate_simulation_configs(simulation_configs):
+                class SimulationConfigs(BaseModel):
+                    simulation_configs: dict[list[float], float, int, int]
+                    
+                    @validator("simulation_configs")
+                    def values_math_relevant(cls, configs):
+                        if configs["number_points"] < 1:
+                            raise ValueError("The minimum number of points in a single Monte Carlo trace should be >= 1.")
+                        if configs["number_simulations"] < 1:
+                            raise ValueError("The minimum number of Monte Carlo traces should be >= 1.")
+                        return configs
 
