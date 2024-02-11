@@ -1,8 +1,11 @@
 # flake8: noqa
 import time
+import logging
 import numpy as np
 
 import apache_beam as beam
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class Parallel_MC_Battery:
     '''
@@ -15,8 +18,11 @@ class Parallel_MC_Battery:
         
     def simulate(self, models, parameters, starting_points, number_points, number_simulations, output_paths="."):
         class SimulateDoFn(beam.DoFn):
+            bundle_counter = 0
+
             def start_bundle(self):
-                print("The models where bundled, and sent to workers for parallel simulation...")
+                logging.INFO(f"Bundle {type(self).bundle_counter} created, and sent to workers for parallel simulation...")
+                type(self).bundle_counter += 1
 
             def process(self, element):
                 model, individual_parameters, starting_point,\
@@ -26,10 +32,11 @@ class Parallel_MC_Battery:
                 fixed_model = model(individual_parameters)
 
                 monte_carlo_traces = []
-                monte_carlo_trace = [].append(monte_carlo_point)
-                
-                for _ in number_individual_simulations:
-                    for _ in number_individual_points:
+                monte_carlo_trace = []
+                monte_carlo_trace.append(monte_carlo_point)
+
+                for _ in range(number_individual_simulations):
+                    for _ in range(number_individual_points):
                         monte_carlo_point = fixed_model(monte_carlo_point)
                         monte_carlo_trace.append(monte_carlo_point)
                     
