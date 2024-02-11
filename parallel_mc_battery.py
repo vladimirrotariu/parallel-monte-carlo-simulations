@@ -13,20 +13,30 @@ class Parallel_MC_Battery:
         self.battery_configs = battery_configs
         self.pipeline_options = pipeline_options
         
-    def simulate(self, models, parameters, starting_points, number_simulations, output_paths):
+    def simulate(self, models, parameters, starting_points, number_points, number_simulations, output_paths="."):
         class SimulateDoFn(beam.DoFn):
+            def start_bundle(self):
+                print("The models where bundled, and sent to workers for parallel simulation...")
+
             def process(self, element):
-                model, individual_parameters, starting_point, number_individual_simulations, output_path = element
+                model, individual_parameters, starting_point,\
+                number_individual_points, number_individual_simulations, output_path = element
 
                 monte_carlo_point = starting_point
                 fixed_model = model(individual_parameters)
 
+                monte_carlo_traces = []
                 monte_carlo_trace = [].append(monte_carlo_point)
-                for _ in number_individual_simulations:
-                    monte_carlo_point = fixed_model(monte_carlo_point)
-                    monte_carlo_trace.append()
                 
-                yield monte_carlo_trace
+                for _ in number_individual_simulations:
+                    for _ in number_individual_points:
+                        monte_carlo_point = fixed_model(monte_carlo_point)
+                        monte_carlo_trace.append(monte_carlo_point)
+                    
+                    monte_carlo_traces.append(monte_carlo_trace)
+                    monte_carlo_point = starting_point
+                
+                yield (monte_carlo_traces, output_path)
         
-        
+
 
