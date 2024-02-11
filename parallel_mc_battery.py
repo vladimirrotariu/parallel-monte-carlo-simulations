@@ -19,13 +19,14 @@ class Parallel_MC_Battery:
                 model, individual_parameters, starting_point, number_individual_simulations, output_path = element
 
                 monte_carlo_point = starting_point
-                model 
+                fixed_model = model(individual_parameters)
 
-                monte_carlo_trace = [monte_carlo_point]
+                monte_carlo_trace = [].append(monte_carlo_point)
                 for _ in number_individual_simulations:
-                    monte_carlo_point = model(monte_carlo_point)
+                    monte_carlo_point = fixed_model(monte_carlo_point)
                     monte_carlo_trace.append()
                 
                 yield monte_carlo_trace
-
+        
+        
 
