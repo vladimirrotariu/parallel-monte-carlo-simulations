@@ -1,6 +1,8 @@
 # flake8: noqa
 import time
 import logging
+import sys
+
 import numpy as np
 from pydantic import BaseModel, validator
 
@@ -9,11 +11,14 @@ import apache_beam as beam
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class ParallelMCBattery:
-    '''
+    """
     Helper class to orchestrate in parallel Monte Carlo simulations for an arbitrary number of models, 
     with low-level parameter granularity.
-    '''
-    def __init__(self, battery_configs, pipeline_options):
+    """
+    default_battery_configs = {"rng":"PCG64","mode":"testing"}
+
+    def __init__(self, pipeline_options, battery_configs=None):
+        battery_configs = battery_configs or type(self).default_battery_configs
         
         class BatteryConfigs(BaseModel):
             battery_configs: dict[str, str] #rng, mode (production, testing)
@@ -25,19 +30,27 @@ class ParallelMCBattery:
 
                 if configs["rng"] not in allowed_rngs:
                     raise ValueError(f"The chosen RNG could not be found.\
-                                        Allowed options: {str(allowed_rngs)[1,-1]}")
+                                        Allowed options: {str(allowed_rngs)[1, len(allowed_rngs) - 1]}")
                 
                 if configs["mode"] not in allowed_modes:
                     raise ValueError(f"The chosen mode could not be found.\
-                                        Allowed options: {str(allowed_modes)[1,-1]}")
+                                        Allowed options: {str(allowed_modes)[1, len(allowed_modes) - 1]}")
                 
 
         try:        
             battery_configs = BatteryConfigs(battery_configs)
+        except KeyError:
+            logging.exception("Missing parameters from battery_configs")
+            sys.exit()
         except ValueError:
             logging.exception("Validation of battery_configs failed")
+            sys.exit()
 
-        self.battery_configs = battery_configs
+        self.mode = battery_configs["mode"]
+
+        exec(f"rng = np.random.Generator(np.random.{battery_configs["rng"]}())")
+        self.rng = rng
+
         self.pipeline_options = pipeline_options
         
     def simulate(self, models, simulation_configs, output_paths="."):
@@ -54,28 +67,31 @@ class ParallelMCBattery:
 
                 try:
                     simulation_configs = self.__validate_simulation_configs(simulation_configs)
+                except KeyError:
+                    logging.exception("Missing parameters from simulation_configs")
+                    sys.exit()
                 except ValueError:
                     logging.exception("Validation of simulation_configs failed")
+                    sys.exit()
 
                 parameters = simulation_configs["parameters"]
                 starting_point = simulation_configs["starting_point"]
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
 
-                monte_carlo_point = starting_point
                 fixed_model = model(parameters)
 
                 monte_carlo_traces = []
                 monte_carlo_trace = []
-                monte_carlo_trace.append(monte_carlo_point)
 
                 for _ in range(number_simulations):
+                    monte_carlo_point = starting_point
+
                     for _ in range(number_points):
                         monte_carlo_point = fixed_model(monte_carlo_point)
                         monte_carlo_trace.append(monte_carlo_point)
                     
                     monte_carlo_traces.append(monte_carlo_trace)
-                    monte_carlo_point = starting_point
                 
                 yield (monte_carlo_traces, output_path)
         
