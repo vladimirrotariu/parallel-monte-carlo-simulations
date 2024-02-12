@@ -75,7 +75,7 @@ class ParallelMCBattery:
             battery_configs = battery_configs or type(self).battery_configs
             rng = battery_configs["rng"]
             mode = battery_configs["mode"]
-        
+
             battery_configs = BatteryConfigs(rng=rng, mode=mode)
             type(self).mode = battery_configs.mode
             rng_mapping = {
@@ -127,7 +127,7 @@ class ParallelMCBattery:
 
             def process(self, element):
                 model, simulation_configs, output_path = element
-               
+
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
 
