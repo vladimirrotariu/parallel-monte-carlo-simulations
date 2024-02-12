@@ -12,41 +12,54 @@ class BatteryConfigs(BaseModel):
     rng: str
     mode: str
 
-    @validator("battery_configs")
-    def values_allowed_options(cls, configs):
+    @validator("rng")
+    def values_allowed_options(cls, rng):
         allowed_rngs = ["PCG64", "Philox", "SFC64", "MT19937"]
-        allowed_modes = ["production", "testing"]
 
-        if cls.rng not in allowed_rngs:
+        if rng not in allowed_rngs:
             raise ValueError(
                 f"Unsupported RNG choice. Allowed options: {' ,'.join(allowed_rngs)}"
             )
 
-        if cls.mode not in allowed_modes:
+        return rng
+
+    @validator("mode")
+    def values_allowed_options(cls, mode):
+        allowed_modes = ["production", "testing"]
+
+        if mode not in allowed_modes:
             raise ValueError(
                 f"Unsupported mode choice. Allowed options: {' ,'.join(allowed_modes)}"
             )
 
-        return configs
+        return mode
 
 
 class SimulationConfigs(BaseModel):
     parameters: list[float]
+    starting_point: float
+    number_simulations: int
+    number_points: int
 
-    simulation_configs: dict[list[float], float, int, int]
+    @validator("number_simulations")
+    def values_math_relevant(cls, number_simulations):
+        if number_simulations < 1:
+            raise ValueError(
+                "The minimum number of Monte Carlo simulations\
+                                               should be >= 1."
+            )
 
-    @validator("simulation_configs")
-    def values_math_relevant(cls, configs):
-        if configs["number_points"] < 1:
+        return number_simulations
+
+    @validator("number_points")
+    def values_math_relevant(cls, number_points):
+        if number_points < 1:
             raise ValueError(
                 "The minimum number of points in a single Monte Carlo\
                                               trace should be >= 1."
             )
 
-        if configs["number_simulations"] < 1:
-            raise ValueError("The minimum number of Monte Carlo traces should be >= 1.")
-
-        return configs
+        return number_points
 
 
 class ParallelMCBattery:
@@ -58,31 +71,53 @@ class ParallelMCBattery:
     battery_configs = {"rng": "PCG64", "mode": "testing"}
 
     def __init__(self, pipeline_options, battery_configs=None):
-        battery_configs = battery_configs or type(self).battery_configs
-
         try:
-            battery_configs = BatteryConfigs(battery_configs)
-            type(self).mode = battery_configs["mode"]
+            battery_configs = battery_configs or type(self).battery_configs
+            rng = battery_configs["rng"]
+            mode = battery_configs["mode"]
+        
+            battery_configs = BatteryConfigs(rng=rng, mode=mode)
+            type(self).mode = battery_configs.mode
             rng_mapping = {
-                    "PCG64": np.random.PCG64,
-                    "Philox": np.random.Philox,
-                    "SFC64": np.random.SFC64,
-                    "MT19937": np.random.MT19937,
-                }
-            
-            rng_generator = rng_mapping[battery_configs["rng"]]
+                "PCG64": np.random.PCG64,
+                "Philox": np.random.Philox,
+                "SFC64": np.random.SFC64,
+                "MT19937": np.random.MT19937,
+            }
+
+            rng_generator = rng_mapping[battery_configs.rng]
 
             self.rng = np.random.default_rng(rng_generator())
             self.rng_64_bits = rng_generator()
         except KeyError:
-            logging.exception("Missing parameters from battery_configs")
+            logging.exception("Missing parameters from battery configuration")
+            raise
         except ValidationError:
-            logging.exception("Validation of battery_configs failed")
+            logging.exception("Validation of battery configuration failed")
             raise
 
         type(self).pipeline_options = pipeline_options
 
     def simulate(self, models, simulation_configs, output_paths="."):
+        try:
+            for simulation_config in simulation_configs:
+                parameters = simulation_config["parameters"]
+                starting_point = simulation_config["starting_point"]
+                number_simulations = simulation_config["number_simulations"]
+                number_points = simulation_config["number_points"]
+                simulation_config = SimulationConfigs(
+                    parameters=parameters,
+                    starting_point=starting_point,
+                    number_simulations=number_simulations,
+                    number_points=number_points,
+                )
+        except KeyError:
+            logging.exception("Missing parameters from simulation configuration")
+            raise
+        except ValidationError:
+            logging.exception("Validation of simulation configurations failed")
+            raise
+
         class SimulateDoFn(beam.DoFn):
             def start_bundle(self):
                 logging.info(
@@ -92,15 +127,7 @@ class ParallelMCBattery:
 
             def process(self, element):
                 model, simulation_configs, output_path = element
-
-                try:
-                    simulation_configs = SimulationConfigs(simulation_configs)
-                except KeyError:
-                    logging.exception("Missing parameters from simulation_configs")
-                except ValidationError:
-                    logging.exception("Validation of simulation_configs failed")
-                    raise
-
+               
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
 
