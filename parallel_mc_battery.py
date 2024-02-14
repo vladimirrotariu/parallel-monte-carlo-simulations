@@ -18,7 +18,8 @@ class BatteryConfigs(BaseModel):
 
         if rng not in allowed_rngs:
             raise ValueError(
-                f"Unsupported RNG choice. Allowed options: {' ,'.join(allowed_rngs)}"
+                f"Unsupported RNG choice.\
+                      Allowed options: {' ,'.join(allowed_rngs)}"
             )
 
         return rng
@@ -29,7 +30,8 @@ class BatteryConfigs(BaseModel):
 
         if mode not in allowed_modes:
             raise ValueError(
-                f"Unsupported mode choice. Allowed options: {' ,'.join(allowed_modes)}"
+                f"Unsupported mode choice.\
+                      Allowed options: {' ,'.join(allowed_modes)}"
             )
 
         return mode
@@ -64,11 +66,10 @@ class SimulationConfigs(BaseModel):
 
 class ParallelMCBattery:
     """
-    Helper class to orchestrate in parallel Monte Carlo simulations for an arbitrary number of models,
+    Helper class to orchestrate in parallel Monte Carlo simulations
+    for an arbitrary number of models,
     with low-level parameter granularity.
     """
-
-    battery_configs = {"rng": "PCG64", "mode": "testing"}
 
     def __init__(self, pipeline_options, battery_configs=None):
         try:
@@ -87,8 +88,8 @@ class ParallelMCBattery:
 
             rng_generator = rng_mapping[battery_configs.rng]
 
-            self.rng = np.random.default_rng(rng_generator())
-            self.rng_64_bits = rng_generator()
+            type(self).rng = np.random.default_rng(rng_generator())
+            type(self).rng_64_bits = rng_generator()
         except KeyError:
             logging.exception("Missing parameters from battery configuration")
             raise
@@ -112,16 +113,23 @@ class ParallelMCBattery:
                     number_points=number_points,
                 )
         except KeyError:
-            logging.exception("Missing parameters from simulation configuration")
+            logging.exception(
+                f"Missing parameters\
+                               from simulation configuration\
+                                  {str(simulation_config)}"
+            )
             raise
         except ValidationError:
-            logging.exception("Validation of simulation configurations failed")
+            logging.exception(
+                f"Validation of simulation configurations\
+                               failed at {str(simulation_config)}"
+            )
             raise
 
         class SimulateDoFn(beam.DoFn):
             def start_bundle(self):
                 logging.info(
-                    f"New bundle created,\
+                    "New bundle created,\
                               and sent to workers for parallel simulation..."
                 )
 
@@ -130,27 +138,34 @@ class ParallelMCBattery:
 
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
-
+                starting_point = simulation_configs["starting_point"]
+                parameters = simulation_configs["parameters"]
                 monte_carlo_traces = []
-                monte_carlo_trace = []
 
-                for _ in range(number_simulations):
-                    if self.mode == "production":
-                        parameters = simulation_configs["parameters"]
-                        fixed_model = model(parameters, self.rng)
-                        starting_point = simulation_configs["starting_point"]
-                        monte_carlo_point = starting_point
+                if self.mode == "production":
+                    for _ in range(number_simulations):
+                        monte_carlo_trace = model(
+                            parameters,
+                            starting_point,
+                            number_points,
+                            ParallelMCBattery.rng,
+                        )
+                        monte_carlo_traces.append(monte_carlo_trace)
+                else:
+                    random_numbers = self.rng_64_bits.integers(
+                        0,
+                        2**64,
+                        size=(number_simulations, number_points),
+                        dtype=np.uint64,
+                    )
 
-                        for _ in range(number_points):
-                            monte_carlo_point = fixed_model(monte_carlo_point)
-                            monte_carlo_trace.append(monte_carlo_point)
-                    else:
-                        for _ in range(number_points):
-                            monte_carlo_point = format(
-                                self.rng_64_bits.random_raw(), "064b"
-                            )
-                            monte_carlo_trace.append(monte_carlo_point)
+                    def to_binary_string(number):
+                        return format(number, "064b")
 
-                    monte_carlo_traces.append(monte_carlo_trace)
+                    vec_to_binary_string = np.vectorize(to_binary_string)
+
+                    monte_carlo_traces = vec_to_binary_string(random_numbers)
+
+                    monte_carlo_traces = monte_carlo_traces.tolist()
 
                 yield (monte_carlo_traces, output_path)
