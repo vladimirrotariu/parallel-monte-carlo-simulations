@@ -1,4 +1,3 @@
-# flake8: noqa
 import time
 import logging
 
@@ -20,7 +19,7 @@ class BatteryConfigs(BaseModel):
             raise ValueError(
                 f"Unsupported RNG choice. Allowed options: {' ,'.join(allowed_rngs)}"
             )
-
+            
         return rng
 
     @validator("mode")
@@ -61,13 +60,11 @@ class SimulationConfigs(BaseModel):
 
         return number_points
 
-
 class ParallelMCBattery:
     """
     Helper class to orchestrate in parallel Monte Carlo simulations for an arbitrary number of models,
     with low-level parameter granularity.
     """
-
     battery_configs = {"rng": "PCG64", "mode": "testing"}
 
     def __init__(self, pipeline_options, battery_configs=None):
