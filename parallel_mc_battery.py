@@ -1,21 +1,26 @@
-import time
+# flake8: noqa
 import os
+import time
 import logging
 
 import numpy as np
 from pydantic import BaseModel, validator, ValidationError
+from typing import Optional, Union, List
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
 
 
 class BatteryConfigs(BaseModel):
-    rng: str
-    mode: str
+    rng: Optional[str] = None
+    pipeline_options: Optional[PipelineOptions] = None
 
     @validator("rng")
     def validate_rng(cls, rng):
         allowed_rngs = ["PCG64", "Philox", "SFC64", "MT19937"]
+
+        if rng == None:
+            rng = "PCG64"
 
         if rng not in allowed_rngs:
             raise ValueError(
@@ -25,21 +30,9 @@ class BatteryConfigs(BaseModel):
 
         return rng
 
-    @validator("mode")
-    def validate_mode(cls, mode):
-        allowed_modes = ["production", "testing"]
-
-        if mode not in allowed_modes:
-            raise ValueError(
-                f"Unsupported mode choice.\
-                      Allowed options: {' ,'.join(allowed_modes)}"
-            )
-
-        return mode
-
 
 class SimulationConfigs(BaseModel):
-    parameters: list[float]
+    parameters: Union[List[float], List[int]]
     starting_point: float
     number_simulations: int
     number_points: int
@@ -79,7 +72,7 @@ class OutputPath(BaseModel):
         if not os.path.isfile(output_path):
             with open(output_path, "x") as f:
                 f.write("")
-                print(f"File {output_path} created.")
+                logging.info(f"File {output_path} created.")
 
         if not os.access(output_path, os.W_OK):
             raise PermissionError(f"Could not write to the {file_name} file")
@@ -92,9 +85,15 @@ class ParallelMCBattery:
     with low-level parameter granularity.
     """
 
-    def __init__(self, pipeline_options, battery_configs=None):
-        battery_configs = ParallelMCBattery.handle_validation_battery(battery_configs)
-        type(self).pipeline_options = pipeline_options
+    def __init__(self, battery_configs):
+        rng = battery_configs["rng"]
+        pipeline_options = battery_configs["pipeline_options"]
+        battery_configs = ParallelMCBattery.handle_validation_battery(
+            rng=rng, pipeline_options=pipeline_options
+        )
+
+        type(self).rng = battery_configs.rng
+        type(self).pipeline_options = battery_configs.pipeline_options
 
     def simulate(self, models, simulation_configs, output_paths="."):
 
@@ -109,7 +108,7 @@ class ParallelMCBattery:
         class SimulateDoFn(beam.DoFn):
             def start_bundle(self):
                 logging.info(
-                    "New bundle created,\
+                    f"New bundle created at {time.time()},\
                               and sent to workers for parallel simulation..."
                 )
 
@@ -122,31 +121,14 @@ class ParallelMCBattery:
                 parameters = simulation_configs["parameters"]
                 monte_carlo_traces = []
 
-                if self.mode == "production":
-                    for _ in range(number_simulations):
-                        monte_carlo_trace = model(
-                            parameters,
-                            starting_point,
-                            number_points,
-                            ParallelMCBattery.rng,
-                        )
-                        monte_carlo_traces.append(monte_carlo_trace)
-                else:
-                    random_numbers = self.rng_64_bits.integers(
-                        0,
-                        2**64,
-                        size=(number_simulations, number_points),
-                        dtype=np.uint64,
+                for _ in range(number_simulations):
+                    monte_carlo_trace = model(
+                        parameters,
+                        starting_point,
+                        number_points,
+                        ParallelMCBattery.rng,
                     )
-
-                    def to_binary_string(number):
-                        return format(number, "064b")
-
-                    vec_to_binary_string = np.vectorize(to_binary_string)
-
-                    monte_carlo_traces = vec_to_binary_string(random_numbers)
-
-                    monte_carlo_traces = monte_carlo_traces.tolist()
+                    monte_carlo_traces.append(monte_carlo_trace)
 
                 yield (monte_carlo_traces, output_path)
 
@@ -155,10 +137,11 @@ class ParallelMCBattery:
         try:
             battery_configs = battery_configs or type(self).battery_configs
             rng = battery_configs["rng"]
-            mode = battery_configs["mode"]
+            pipeline_options = battery_configs["pipeline_options"]
 
-            battery_configs = BatteryConfigs(rng=rng, mode=mode)
-            type(self).mode = battery_configs.mode
+            battery_configs = BatteryConfigs(rng=rng, pipeline_options=pipeline_options)
+            type(self).pipeline_options = battery_configs.mode
+
             rng_mapping = {
                 "PCG64": np.random.PCG64,
                 "Philox": np.random.Philox,
@@ -169,10 +152,6 @@ class ParallelMCBattery:
             rng_generator = rng_mapping[battery_configs.rng]
 
             type(self).rng = np.random.default_rng(rng_generator())
-            type(self).rng_64_bits = rng_generator()
-        except KeyError:
-            logging.exception("Missing parameters from battery configuration")
-            raise
         except ValidationError:
             logging.exception("Validation of battery configuration failed")
             raise
