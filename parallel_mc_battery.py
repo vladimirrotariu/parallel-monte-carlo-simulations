@@ -1,6 +1,5 @@
 # flake8: noqa
 import os
-import time
 import logging
 from typing import Optional, Union, List
 
@@ -116,20 +115,23 @@ class ParallelMCBattery:
 
         ParallelMCBattery.output_paths = output_paths
 
-        class SimulateDoFn(beam.DoFn):
-            def setup(self):
-                self.rng_generator = ParallelMCBattery.rng_generator
+        index_seeds = [i for i in range(orchestration_dimension)]
 
+        input_collection = list(
+            zip(models, simulation_configs, output_paths, index_seeds)
+        )
+
+        class SimulateDoFn(beam.DoFn):
             def start_bundle(self):
                 logging.info(
-                    f"New bundle created at {time.time()},\
-                              and sent to workers for parallel simulation..."
+                    f"New bundle created, and sent to workers for parallel simulation..."
                 )
 
             def process(self, element):
                 model, simulation_configs, output_path, index_seed = element
 
-                rng = self.rng_generator(index_seed)
+                rng_instance = ParallelMCBattery.rng_generator(seed=index_seed)
+                rng = np.random.default_rng(rng_instance)
 
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
@@ -148,7 +150,12 @@ class ParallelMCBattery:
 
                 yield (monte_carlo_traces, output_path)
 
-        # with beam.Pipeline(options=ParallelMCBattery.pipeline_options) as p:
+        with beam.Pipeline(options=ParallelMCBattery.pipeline_options) as pipeline:
+            (
+                pipeline
+                | "Initialize models workbench..." >> beam.Create(input_collection)
+                | "Generate Monte Carlo simulations" >> beam.ParDo(SimulateDoFn())
+            )
 
     @classmethod
     def handle_validation_battery(self, battery_configs):
