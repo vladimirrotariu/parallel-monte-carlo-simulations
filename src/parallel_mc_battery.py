@@ -1,4 +1,3 @@
-# flake8: noqa
 import os
 import csv
 import logging
@@ -125,7 +124,8 @@ class ParallelMCBattery:
         class SimulateDoFn(beam.DoFn):
             def start_bundle(self):
                 logging.info(
-                    f"New bundle created, and sent to workers for parallel simulation..."
+                    "New bundle created, and sent to workers for parallel\
+                          simulation..."
                 )
 
             def process(self, element):
