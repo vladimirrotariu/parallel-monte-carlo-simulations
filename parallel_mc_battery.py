@@ -2,13 +2,13 @@
 import os
 import time
 import logging
-
-import numpy as np
-from pydantic import BaseModel, validator, ValidationError
 from typing import Optional, Union, List
 
+import numpy as np
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
+
+from pydantic import BaseModel, validator, ValidationError
 
 
 class BatteryConfigs(BaseModel):
@@ -19,7 +19,7 @@ class BatteryConfigs(BaseModel):
     def validate_rng(cls, rng):
         allowed_rngs = ["PCG64", "Philox", "SFC64", "MT19937"]
 
-        if rng == None:
+        if rng is None:
             rng = "PCG64"
 
         if rng not in allowed_rngs:
@@ -65,17 +65,21 @@ class OutputPath(BaseModel):
     def validate_output_path(cls, output_path):
         directory_path, file_name = os.path.split(output_path)
 
-        if not os.path.isdir(output_path):
+        if not os.path.exists(directory_path):
             os.makedirs(directory_path, exist_ok=True)
             logging.info(f"Directory {directory_path} created.")
 
-        if not os.path.isfile(output_path):
-            with open(output_path, "x") as f:
-                f.write("")
+        if file_name and not os.path.exists(output_path):
+            try:
+                with open(output_path, "x") as f:
+                    f.write("")
                 logging.info(f"File {output_path} created.")
+            except PermissionError:
+                raise PermissionError(
+                    f"Not enough permissions to write to the {file_name} file"
+                )
 
-        if not os.access(output_path, os.W_OK):
-            raise PermissionError(f"Could not write to the {file_name} file")
+        return output_path
 
 
 class ParallelMCBattery:
@@ -86,26 +90,36 @@ class ParallelMCBattery:
     """
 
     def __init__(self, battery_configs):
-        rng = battery_configs["rng"]
-        pipeline_options = battery_configs["pipeline_options"]
-        battery_configs = ParallelMCBattery.handle_validation_battery(
-            rng=rng, pipeline_options=pipeline_options
-        )
+        try:
+            rng = battery_configs["rng"]
+            pipeline_options = battery_configs["pipeline_options"]
+            battery_configs = ParallelMCBattery.handle_validation_battery(
+                rng=rng, pipeline_options=pipeline_options
+            )
+        except KeyError:
+            logging.exception("Missing battery configurations")
 
-        type(self).rng = battery_configs.rng
-        type(self).pipeline_options = battery_configs.pipeline_options
+        ParallelMCBattery.rng_generator = battery_configs.rng_generator
+        ParallelMCBattery.pipeline_options = battery_configs.pipeline_options
 
-    def simulate(self, models, simulation_configs, output_paths="."):
+    def simulate(self, models, simulation_configs, output_paths=None):
 
         simulation_configs = ParallelMCBattery.handle_validation_simulation(
             simulation_configs
         )
 
-        output_paths = ParallelMCBattery.handle_validation_output(output_paths)
+        orchestration_dimension = len(models)
+
+        output_paths = ParallelMCBattery.handle_validation_output(
+            output_paths, orchestration_dimension
+        )
 
         ParallelMCBattery.output_paths = output_paths
 
         class SimulateDoFn(beam.DoFn):
+            def setup(self):
+                self.rng_generator = ParallelMCBattery.rng_generator
+
             def start_bundle(self):
                 logging.info(
                     f"New bundle created at {time.time()},\
@@ -113,7 +127,9 @@ class ParallelMCBattery:
                 )
 
             def process(self, element):
-                model, simulation_configs, output_path = element
+                model, simulation_configs, output_path, index_seed = element
+
+                rng = self.rng_generator(index_seed)
 
                 number_points = simulation_configs["number_points"]
                 number_simulations = simulation_configs["number_simulations"]
@@ -126,21 +142,23 @@ class ParallelMCBattery:
                         parameters,
                         starting_point,
                         number_points,
-                        ParallelMCBattery.rng,
+                        rng,
                     )
                     monte_carlo_traces.append(monte_carlo_trace)
 
                 yield (monte_carlo_traces, output_path)
 
+        # with beam.Pipeline(options=ParallelMCBattery.pipeline_options) as p:
+
     @classmethod
     def handle_validation_battery(self, battery_configs):
         try:
-            battery_configs = battery_configs or type(self).battery_configs
+            battery_configs = battery_configs or ParallelMCBattery.battery_configs
             rng = battery_configs["rng"]
             pipeline_options = battery_configs["pipeline_options"]
 
             battery_configs = BatteryConfigs(rng=rng, pipeline_options=pipeline_options)
-            type(self).pipeline_options = battery_configs.mode
+            ParallelMCBattery.pipeline_options = battery_configs.pipeline_options
 
             rng_mapping = {
                 "PCG64": np.random.PCG64,
@@ -151,7 +169,7 @@ class ParallelMCBattery:
 
             rng_generator = rng_mapping[battery_configs.rng]
 
-            type(self).rng = np.random.default_rng(rng_generator())
+            battery_configs.rng_generator = rng_generator
         except ValidationError:
             logging.exception("Validation of battery configuration failed")
             raise
@@ -189,12 +207,19 @@ class ParallelMCBattery:
         return simulation_configs
 
     @classmethod
-    def handle_validation_output(self, output_paths):
-        try:
-            for output_path in output_paths:
-                output_path = OutputPath(output_path=output_path)
-        except PermissionError:
-            logging.exception(f"The file for the path {output_path} cannot be accessed")
-            raise
+    def handle_validation_output(self, output_paths, orchestration_dimension):
+        if output_paths is None:
+            output_paths = ParallelMCBattery.output_paths or [
+                "." for _ in range(orchestration_dimension)
+            ]
+        else:
+            try:
+                for output_path in output_paths:
+                    output_path = OutputPath(output_path=output_path)
+            except PermissionError:
+                logging.exception(
+                    f"The file for the path {output_path} cannot be accessed"
+                )
+                raise
 
         return output_paths
