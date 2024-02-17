@@ -1,6 +1,6 @@
 from setuptools import setup
-from version import __version__ as version
 
+version = "0.0.1"
 
 setup(name='parallel_mc_battery',
       version=version,
