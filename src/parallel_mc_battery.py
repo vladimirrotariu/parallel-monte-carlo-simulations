@@ -1,5 +1,6 @@
 import os
 import csv
+import time
 import logging
 from typing import Optional, Union, List
 
@@ -29,12 +30,15 @@ class BatteryConfigs(BaseModel):
 
         return rng
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class SimulationConfigs(BaseModel):
-    parameters: Union[List[float], List[int]]
-    starting_point: float
     number_simulations: int
     number_points: int
+    parameters: Optional[Union[List[float], List[int]]] = None
+    starting_point: Optional[float] = None
 
     @validator("number_simulations")
     def validate_number_simulations(cls, number_simulations):
@@ -89,16 +93,11 @@ class ParallelMCBattery:
     """
 
     def __init__(self, battery_configs):
-        try:
-            rng = battery_configs["rng"]
-            pipeline_options = battery_configs["pipeline_options"]
-            battery_configs = ParallelMCBattery.handle_validation_battery(
-                rng=rng, pipeline_options=pipeline_options
-            )
-        except KeyError:
-            logging.exception("Missing battery configurations")
+        battery_configs = ParallelMCBattery.handle_validation_battery(
+            battery_configs=battery_configs
+        )
 
-        ParallelMCBattery.rng_generator = battery_configs.rng_generator
+        ParallelMCBattery.rng_generator = battery_configs.rng
         ParallelMCBattery.pipeline_options = battery_configs.pipeline_options
 
     def simulate(self, models, simulation_configs, output_paths=None):
@@ -108,6 +107,8 @@ class ParallelMCBattery:
         )
 
         orchestration_dimension = len(models)
+
+        ParallelMCBattery.output_paths = output_paths
 
         output_paths = ParallelMCBattery.handle_validation_output(
             output_paths, orchestration_dimension
@@ -141,14 +142,23 @@ class ParallelMCBattery:
                 monte_carlo_traces = []
 
                 for _ in range(number_simulations):
-                    monte_carlo_trace = model(
-                        parameters,
-                        starting_point,
-                        number_points,
-                        rng,
-                    )
-                    monte_carlo_traces.append(monte_carlo_trace)
+                    monte_carlo_trace = []
 
+                    if starting_point is None and parameters is None:
+                        monte_carlo_trace = model(
+                            number_points,
+                            rng,
+                        )
+
+                    if starting_point is None and parameters is not None:
+                        monte_carlo_trace = model(number_points, rng, parameters)
+
+                    if starting_point is not None and parameters is not None:
+                        monte_carlo_trace = model(
+                            number_points, rng, parameters, starting_point
+                        )
+
+                    monte_carlo_traces.append(monte_carlo_trace)
                 yield (monte_carlo_traces, output_path)
 
         class WriteToCsvDoFn(beam.DoFn):
@@ -166,7 +176,7 @@ class ParallelMCBattery:
                 pipeline
                 | "Initialize models workbench..." >> beam.Create(input_collection)
                 | "Generate Monte Carlo simulations" >> beam.ParDo(SimulateDoFn())
-                | "Write simulations to output files" >> beam.Pardo(WriteToCsvDoFn())
+                | "Write simulations to output files" >> beam.ParDo(WriteToCsvDoFn())
             )
 
         logging.info("The Monte Carlo simulations completed succesfully.")
@@ -190,7 +200,9 @@ class ParallelMCBattery:
 
             rng_generator = rng_mapping[battery_configs.rng]
 
-            battery_configs.rng_generator = rng_generator
+            battery_configs.rng = rng_generator
+        except KeyError:
+            logging.exception("Missing battery configurations")
         except ValidationError:
             logging.exception("Validation of battery configuration failed")
             raise
@@ -198,31 +210,37 @@ class ParallelMCBattery:
         return battery_configs
 
     @classmethod
-    def handle_validation_simulation(simulation_configs):
-        try:
-            for simulation_config in simulation_configs:
+    def handle_validation_simulation(self, simulation_configs):
+        for simulation_config in simulation_configs:
+            if "parameters" not in simulation_config:
+                simulation_config["parameters"] = None
+            if "starting_point" not in simulation_config:
+                simulation_config["starting_point"] = None
+
+        for simulation_config in simulation_configs:
+            try:
                 parameters = simulation_config["parameters"]
                 starting_point = simulation_config["starting_point"]
                 number_simulations = simulation_config["number_simulations"]
                 number_points = simulation_config["number_points"]
                 simulation_config = SimulationConfigs(
-                    parameters=parameters,
-                    starting_point=starting_point,
                     number_simulations=number_simulations,
                     number_points=number_points,
+                    parameters=parameters,
+                    starting_point=starting_point,
                 )
-        except KeyError:
-            logging.exception(
-                f"Missing parameters from simulation configuration\
-                                  {str(simulation_config)}"
-            )
-            raise
-        except ValidationError:
-            logging.exception(
-                f"Validation of simulation configurations\
-                               failed at {str(simulation_config)}"
-            )
-            raise
+            except KeyError:
+                logging.exception(
+                    f"Missing parameters from simulation configuration\
+                                {str(simulation_config)}"
+                )
+                raise
+            except ValidationError:
+                logging.exception(
+                    f"Validation of simulation configurations\
+                            failed at {str(simulation_config)}"
+                )
+                raise
 
         return simulation_configs
 
@@ -230,7 +248,8 @@ class ParallelMCBattery:
     def handle_validation_output(self, output_paths, orchestration_dimension):
         if output_paths is None:
             output_paths = ParallelMCBattery.output_paths or [
-                "." for _ in range(orchestration_dimension)
+                os.path.join(".", f"{i}.txt")
+                for i in range(orchestration_dimension)
             ]
         else:
             try:
