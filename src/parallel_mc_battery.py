@@ -1,6 +1,5 @@
 import os
 import csv
-import time
 import logging
 from typing import Optional, Union, List
 
@@ -13,7 +12,7 @@ from pydantic import BaseModel, validator, ValidationError
 
 class BatteryConfigs(BaseModel):
     rng: Optional[str] = None
-    pipeline_options: Optional[PipelineOptions] = None
+    pipeline_options: PipelineOptions 
 
     @validator("rng")
     def validate_rng(cls, rng):
