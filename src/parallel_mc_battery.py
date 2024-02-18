@@ -123,12 +123,6 @@ class ParallelMCBattery:
         )
 
         class SimulateDoFn(beam.DoFn):
-            def start_bundle(self):
-                logging.info(
-                    "New bundle created, and sent to workers for parallel\
-                          simulation..."
-                )
-
             def process(self, element):
                 model, simulation_configs, output_path, index_seed = element
 
@@ -248,8 +242,7 @@ class ParallelMCBattery:
     def handle_validation_output(self, output_paths, orchestration_dimension):
         if output_paths is None:
             output_paths = ParallelMCBattery.output_paths or [
-                os.path.join(".", f"{i}.txt")
-                for i in range(orchestration_dimension)
+                os.path.join(".", f"{i}.txt") for i in range(orchestration_dimension)
             ]
         else:
             try:
