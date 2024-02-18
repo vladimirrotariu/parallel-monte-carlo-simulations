@@ -4,10 +4,19 @@
 ```bash
 pip install "git+https://github.com/vladimirrotariu/parallel-monte-carlo-simulations#egg=parallel_mc_battery&subdirectory=src"
 ```
-### Description
- `ParallelMCBattery` is a helper class to orchestrate in-parallel Monte Carlo simulations. Its primary role is to abstract away the creation, execution, and management of an efficient Apache Beam pipeline.
+### Importing
+```python
+from parallel_mc_battery import ParallelMCBattery
+```
+### TL; DR
+`ParallelMCBattery` is a helper class to orchestrate in-parallel Monte Carlo simulations. Its primary role is to abstract away the creation, execution, and management of an efficient Apache Beam pipeline.
 
-More precisely, it equips its instances with the attributes corresponding to the values for the *battery configuration dictionary* keys: 
+### The demo Jupyter notebooks (highly recommended):
+1. [Biased and unbiased coin sequences of arbitrary length](demo/demo.ipynb)
+### Description
+ 
+
+`ParallelMCBattery` equips its instances with the attributes corresponding to the values for the *battery configuration dictionary* keys: 
 * `rng` --> an __OPTIONAL__ *string* from the choices `"PCG64"`, `"Philox"`, `"SFC64"`, `"MT19937"`, which defaults to `"PCG64"` if omitted
 * `pipeline_options` --> an instance of the class [PipelineOptions](https://beam.apache.org/releases/pydoc/2.33.0/apache_beam.options.pipeline_options.html#apache_beam.options.pipeline_options.PipelineOptions) of Apache Beam
 
@@ -23,8 +32,6 @@ The Monte Carlo simulations are defined by specifying the values for the *simula
 Moreover, when defining the Monte Carlo simulations, one further specifies the output_paths:
 * `output_paths` --> an __OPTIONAL__ list of *string* values representing the *local* paths of the output csv files, and which defaults to the directory where the script with the Monte Carlo simulation is executed (the BigQuery/Google Cloud Storage adaptor currently UNDER DEVELOPMENT)
 
-### The demo Jupyter notebooks (highly recommended):
-1. [Biased and unbiased coin sequences of arbitrary length](demo/demo.ipynb)
 ### General workflow
 One may configure the Monte Carlo parallel battery by choosing the desired random number generator, in this case [Philox](https://numpy.org/doc/stable/reference/random/bit_generators/philox.html#philox-counter-based-rng), and the pipeline options instance of the class [PipelineOptions](https://beam.apache.org/releases/pydoc/2.33.0/apache_beam.options.pipeline_options.html#apache_beam.options.pipeline_options.PipelineOptions) of Apache Beam, for this example choosing for simplicity the default settings, which means the pipeline runs on the local `Direct Runner`.
 ```python
@@ -54,7 +61,7 @@ biased_coin_config = {"parameters": [0.7], "number_simulations" : 60000, "number
 simulation_configs = [unbiased_coin_config, biased_coin_config]
 ```
 
-And, finally, one may perform the Monte Carlo simulations configured above, having in mind that without specifying `output_paths`, the output csv files will be written by default in the directory where is the Python script with the structure
+And, finally, one may perform the Monte Carlo simulations configured above, having in mind that without specifying `output_paths`, the output csv files will be written by default in the directory where it is executed the Python script which calls the object method `simulate`:
 ```python
 battery_parallel_MC.simulate(models, simulation_configs)
 ```
