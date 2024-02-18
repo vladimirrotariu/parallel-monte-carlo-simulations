@@ -61,7 +61,7 @@ biased_coin_config = {"parameters": [0.7], "number_simulations" : 60000, "number
 simulation_configs = [unbiased_coin_config, biased_coin_config]
 ```
 
-And, finally, one may perform the Monte Carlo simulations configured above, having in mind that without specifying `output_paths`, the output csv files will be written by default in the directory where it is executed the Python script which calls the object method `simulate`:
+And now one may perform the Monte Carlo simulations configured above, having in mind that without specifying `output_paths`, the output csv files will be written by default in the directory where it is executed the Python script which calls the object method `simulate`:
 ```python
 battery_parallel_MC.simulate(models, simulation_configs)
 ```
