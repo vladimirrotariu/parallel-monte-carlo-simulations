@@ -5,26 +5,32 @@ from typing import Optional, Union, List
 
 import numpy as np
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import (
+    PipelineOptions,
+)
 
 from pydantic import BaseModel, validator, ValidationError
 
 
 class BatteryConfigs(BaseModel):
     rng: Optional[str] = None
-    pipeline_options: PipelineOptions 
+    pipeline_options: PipelineOptions
 
     @validator("rng")
     def validate_rng(cls, rng):
-        allowed_rngs = ["PCG64", "Philox", "SFC64", "MT19937"]
+        allowed_rngs = [
+            "PCG64",
+            "Philox",
+            "SFC64",
+            "MT19937",
+        ]
 
         if rng is None:
             rng = "PCG64"
 
         if rng not in allowed_rngs:
             raise ValueError(
-                f"Unsupported RNG choice.\
-                      Allowed options: {' ,'.join(allowed_rngs)}"
+                f"Unsupported RNG choice. Allowed options: {' ,'.join(allowed_rngs)}"
             )
 
         return rng
@@ -43,8 +49,7 @@ class SimulationConfigs(BaseModel):
     def validate_number_simulations(cls, number_simulations):
         if number_simulations < 1:
             raise ValueError(
-                "The minimum number of Monte Carlo simulations\
-                                               should be >= 1."
+                "The minimum number of Monte Carlo simulations should be >= 1."
             )
 
         return number_simulations
@@ -53,8 +58,7 @@ class SimulationConfigs(BaseModel):
     def validate_number_points(cls, number_points):
         if number_points < 1:
             raise ValueError(
-                "The minimum number of points in a single Monte Carlo\
-                                              trace should be >= 1."
+                "The minimum number of points in a single Monte Carlo trace should be >= 1."
             )
 
         return number_points
@@ -118,12 +122,22 @@ class ParallelMCBattery:
         index_seeds = [i for i in range(orchestration_dimension)]
 
         input_collection = list(
-            zip(models, simulation_configs, output_paths, index_seeds)
+            zip(
+                models,
+                simulation_configs,
+                output_paths,
+                index_seeds,
+            )
         )
 
         class SimulateDoFn(beam.DoFn):
             def process(self, element):
-                model, simulation_configs, output_path, index_seed = element
+                (
+                    model,
+                    simulation_configs,
+                    output_path,
+                    index_seed,
+                ) = element
 
                 rng_instance = ParallelMCBattery.rng_generator(seed=index_seed)
                 rng = np.random.default_rng(rng_instance)
@@ -148,7 +162,10 @@ class ParallelMCBattery:
 
                     if starting_point is not None and parameters is not None:
                         monte_carlo_trace = model(
-                            number_points, rng, parameters, starting_point
+                            number_points,
+                            rng,
+                            parameters,
+                            starting_point,
                         )
 
                     monte_carlo_traces.append(monte_carlo_trace)
@@ -181,7 +198,9 @@ class ParallelMCBattery:
             rng = battery_configs["rng"]
             pipeline_options = battery_configs["pipeline_options"]
 
-            battery_configs = BatteryConfigs(rng=rng, pipeline_options=pipeline_options)
+            battery_configs = BatteryConfigs(
+                rng=rng, pipeline_options=pipeline_options
+            )
             ParallelMCBattery.pipeline_options = battery_configs.pipeline_options
 
             rng_mapping = {
@@ -224,14 +243,12 @@ class ParallelMCBattery:
                 )
             except KeyError:
                 logging.exception(
-                    f"Missing parameters from simulation configuration\
-                                {str(simulation_config)}"
+                    f"Missing parameters from simulation configuration {str(simulation_config)}"
                 )
                 raise
             except ValidationError:
                 logging.exception(
-                    f"Validation of simulation configurations\
-                            failed at {str(simulation_config)}"
+                    f"Validation of simulation configurations failed at {str(simulation_config)}"
                 )
                 raise
 
