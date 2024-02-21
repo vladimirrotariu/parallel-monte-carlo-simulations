@@ -1,18 +1,19 @@
 # Parallelize statistical simulations with Apache Beam
-## ParallelMCBattery class to parallelize Monte Carlo simulations
-### Installation
+## Installation of the `parallel_simulations` module
+
+The following module efficiently abstracts away the creation and of an Apache Beam pipeline that may be run on different runners, thus fully incorporating the flexibility of Apache Beam, leaving to the users the selection of the pipeline options.
 ```bash
-pip install "git+https://github.com/vladimirrotariu/parallel-monte-carlo-simulations#egg=parallel_mc_battery&subdirectory=src"
+pip install -e "git+https://github.com/vladimirrotariu/parallel-monte-carlo-simulations#egg=parallel_simulations&subdirectory=src"
 ```
-### Importing
+### Importing the ParallelMCBattery class to parallelize Monte Carlo simulations
 ```python
-from parallel_mc_battery import ParallelMCBattery
+from parallel_simulations import ParallelMCBattery
 ```
 ### TL; DR
 `ParallelMCBattery` is a helper class to orchestrate in-parallel Monte Carlo simulations. Its primary role is to abstract away the creation, execution, and management of an efficient Apache Beam pipeline.
 
 ### The demo Jupyter notebooks (highly recommended):
-1. [Biased and unbiased coin sequences of arbitrary length](demo/demo.ipynb)
+1. [Biased and unbiased coin sequences of arbitrary length](demos/demo.ipynb)
 ### Description
  
 
@@ -55,6 +56,7 @@ To configure the simulations for these models, one further uses a list of dictio
 ```python
 # 100,000 simulations of sequences of 3 heads or tails, for an unbiased coin
 unbiased_coin_config = {"parameters": [0.5], "number_simulations" : 100000, "number_points": 3}
+
 # 60,000 simulations of sequences of 5 heads or tails, for a biased coin 
 biased_coin_config = {"parameters": [0.7], "number_simulations" : 60000, "number_points": 5}
 
@@ -65,4 +67,4 @@ And now one may perform the Monte Carlo simulations configured above, having in 
 ```python
 battery_parallel_MC.simulate(models, simulation_configs)
 ```
-
+For forther details, see the related [Jupyter notebook](demos/demo.ipynb).
