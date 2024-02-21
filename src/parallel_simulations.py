@@ -71,7 +71,7 @@ class OutputPath(BaseModel):
     def validate_output_path(cls, output_path):
         directory_path, file_name = os.path.split(output_path)
 
-        if not os.path.exists(directory_path):
+        if directory_path and not os.path.exists(directory_path):
             os.makedirs(directory_path, exist_ok=True)
             logging.info(f"Directory {directory_path} created.")
 
