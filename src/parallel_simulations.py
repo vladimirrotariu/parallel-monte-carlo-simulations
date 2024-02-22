@@ -42,8 +42,8 @@ class BatteryConfigs(BaseModel):
 class SimulationConfigs(BaseModel):
     number_simulations: int
     number_points: int
-    parameters: Optional[Union[List[float], List[int]]] = None
-    starting_point: Optional[float] = None
+    parameters: Optional[Union[int, float, List[float], List[int]]] = None
+    starting_point: Optional[Union[float, str, List[float], List[str]]] = None
 
     @validator("number_simulations")
     def validate_number_simulations(cls, number_simulations):
