@@ -25,10 +25,11 @@ Note that the **pipeline options** is the only way the parallel execution can be
 
 The Monte Carlo simulations are defined by specifying the values for the *simulation configuration dictionary* keys:
 * `models` --> a list of functions that embodies the logic of the model (see Jupyter notebooks below)
-* `parameters` --> an __OPTIONAL__ list (possibly of lists) of values of type *float* representing the parameters of each of the model defined in `models`
-* `starting point` --> an __OPTIONAL__  *float* representing the start of the Monte Carlo simulation
 * `number_simulations` --> an *integer* representing the number of Monte Carlo simulations
 * `number_points` --> an *integer* representing the number of points in a Monte Carlo simulation
+* `parameters` --> an __OPTIONAL__ (list of) values of type *float*/*str*/*int* representing the parameters of each of the model defined in `models`
+* `starting point` --> an __OPTIONAL__  (list of) *float*/*str* representing the start poin/sequence of points of the Monte Carlo simulation
+
 
 Moreover, when defining the Monte Carlo simulations, one further specifies the output_paths:
 * `output_paths` --> an __OPTIONAL__ list of *string* values representing the *local* paths of the output csv files, and which defaults to the directory where the script with the Monte Carlo simulation is executed (the BigQuery/Google Cloud Storage adaptor currently UNDER DEVELOPMENT)
@@ -55,10 +56,10 @@ models = [CoinSequence, CoinSequence]
 To configure the simulations for these models, one further uses a list of dictionaries, each dictionary corresponding to one of the `models`.
 ```python
 # 100,000 simulations of sequences of 3 heads or tails, for an unbiased coin
-unbiased_coin_config = {"parameters": [0.5], "number_simulations" : 100000, "number_points": 3}
+unbiased_coin_config = {"parameters": 0.5, "number_simulations" : 100000, "number_points": 3}
 
 # 60,000 simulations of sequences of 5 heads or tails, for a biased coin 
-biased_coin_config = {"parameters": [0.7], "number_simulations" : 60000, "number_points": 5}
+biased_coin_config = {"parameters": 0.7, "number_simulations" : 60000, "number_points": 5}
 
 simulation_configs = [unbiased_coin_config, biased_coin_config]
 ```
