@@ -13,7 +13,7 @@ from parallel_simulations import ParallelMCBattery
 `ParallelMCBattery` is a helper class to orchestrate in-parallel Monte Carlo simulations. Its primary role is to abstract away the creation, execution, and management of an efficient Apache Beam pipeline.
 
 ### The demo Jupyter notebooks (highly recommended):
-1. [Biased and unbiased coin sequences of arbitrary length](demos/demo.ipynb)
+1. [Biased and unbiased coin sequences of arbitrary length](demos/demo_coin_sequences.ipynb)
 ### Description
  
 
@@ -67,4 +67,4 @@ And now one may perform the Monte Carlo simulations configured above, having in 
 ```python
 battery_parallel_MC.simulate(models, simulation_configs)
 ```
-For forther details, see the related [Jupyter notebook](demos/demo.ipynb).
+For forther details, see the related [Jupyter notebook](demos/demo_coin_sequences.ipynb).
