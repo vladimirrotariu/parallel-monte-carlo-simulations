@@ -1,7 +1,7 @@
 import os
 import csv
 import logging
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Any
 
 import numpy as np
 import apache_beam as beam
@@ -17,7 +17,7 @@ class BatteryConfigs(BaseModel):
     pipeline_options: PipelineOptions
 
     @validator("rng")
-    def validate_rng(cls, rng):
+    def validate_rng(cls, rng: str) -> str:
         allowed_rngs = [
             "PCG64",
             "Philox",
@@ -46,7 +46,7 @@ class SimulationConfigs(BaseModel):
     starting_point: Optional[Union[float, str, List[float], List[str]]] = None
 
     @validator("number_simulations")
-    def validate_number_simulations(cls, number_simulations):
+    def validate_number_simulations(cls, number_simulations: int) -> int:
         if number_simulations < 1:
             raise ValueError(
                 "The minimum number of Monte Carlo simulations should be >= 1."
@@ -55,7 +55,7 @@ class SimulationConfigs(BaseModel):
         return number_simulations
 
     @validator("number_points")
-    def validate_number_points(cls, number_points):
+    def validate_number_points(cls, number_points: int) -> int:
         if number_points < 1:
             raise ValueError(
                 "The minimum number of points in a single Monte Carlo trace should be >= 1."
@@ -68,7 +68,7 @@ class OutputPath(BaseModel):
     output_path: str
 
     @validator("output_path")
-    def validate_output_path(cls, output_path):
+    def validate_output_path(cls, output_path: str) -> str:
         directory_path, file_name = os.path.split(output_path)
 
         if directory_path and not os.path.exists(directory_path):
@@ -104,7 +104,6 @@ class ParallelMCBattery:
         ParallelMCBattery.pipeline_options = battery_configs.pipeline_options
 
     def simulate(self, models, simulation_configs, output_paths=None):
-
         simulation_configs = ParallelMCBattery.handle_validation_simulation(
             simulation_configs
         )
@@ -192,7 +191,7 @@ class ParallelMCBattery:
         logging.info("The Monte Carlo simulations completed succesfully.")
 
     @classmethod
-    def handle_validation_battery(self, battery_configs):
+    def handle_validation_battery(self, battery_configs: dict[Any]) -> dict[Any]:
         try:
             battery_configs = battery_configs or ParallelMCBattery.battery_configs
             rng = battery_configs["rng"]
@@ -222,7 +221,7 @@ class ParallelMCBattery:
         return battery_configs
 
     @classmethod
-    def handle_validation_simulation(self, simulation_configs):
+    def handle_validation_simulation(self, simulation_configs: dict[Any]) -> dict[Any]:
         for simulation_config in simulation_configs:
             if "parameters" not in simulation_config:
                 simulation_config["parameters"] = None
@@ -255,7 +254,7 @@ class ParallelMCBattery:
         return simulation_configs
 
     @classmethod
-    def handle_validation_output(self, output_paths, orchestration_dimension):
+    def handle_validation_output(self, output_paths: list[str], orchestration_dimension) -> list[str]:
         if output_paths is None:
             output_paths = ParallelMCBattery.output_paths or [
                 os.path.join(".", f"{i}.txt") for i in range(orchestration_dimension)
