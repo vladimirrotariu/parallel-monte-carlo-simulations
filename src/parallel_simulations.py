@@ -7,8 +7,8 @@ import apache_beam as beam
 from pydantic import validator, ValidationError
 from typing import Any
 
-from .models import BatteryConfigs, SimulationConfigs, OutputPath
-from .utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
+from src.models import BatteryConfigs, SimulationConfigs, OutputPath
+from src.utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
 
 
 class ParallelMCBattery:
