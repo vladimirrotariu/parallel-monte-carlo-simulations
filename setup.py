@@ -24,6 +24,6 @@ setup(
         "Programming Language :: Python :: 3.11",
     ],
     python_requires=">=3.8",
-    packages=find_packages(where="parallel_simulations"),
+    packages=find_packages(),
     package_dir={"": "parallel_simulations"},
 )

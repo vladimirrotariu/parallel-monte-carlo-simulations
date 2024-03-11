@@ -8,11 +8,11 @@ import apache_beam as beam
 from pydantic import validator, ValidationError
 from typing import Any
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(ROOT_DIR)
 
-from parallel_simulations.models import BatteryConfigs, SimulationConfigs, OutputPath
-from parallel_simulations.utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
+from .models import BatteryConfigs, SimulationConfigs, OutputPath
+from .utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
 
 
 class ParallelMCBattery:
