@@ -11,8 +11,8 @@ from typing import Any
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT_DIR)
 
-from .models import BatteryConfigs, SimulationConfigs, OutputPath
-from .utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
+from parallel_simulations.models import BatteryConfigs, SimulationConfigs, OutputPath
+from parallel_simulations.utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
 
 
 class ParallelMCBattery:
