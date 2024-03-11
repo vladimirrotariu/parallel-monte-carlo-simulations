@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 
 import numpy as np
@@ -7,8 +8,11 @@ import apache_beam as beam
 from pydantic import validator, ValidationError
 from typing import Any
 
-from src.models import BatteryConfigs, SimulationConfigs, OutputPath
-from src.utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from parallel_simulations.models import BatteryConfigs, SimulationConfigs, OutputPath
+from parallel_simulations.utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
 
 
 class ParallelMCBattery:
