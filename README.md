@@ -3,7 +3,7 @@
 
 The following module efficiently abstracts away the creation and of an Apache Beam pipeline that may be run on different runners, thus fully incorporating the flexibility of Apache Beam, leaving to the users the selection of the pipeline options.
 ```bash
-pip install -e "git+https://github.com/vladimirrotariu/parallel-monte-carlo-simulations#egg=parallel_simulations&subdirectory=src"
+pip install -e "git+https://github.com/vladimirrotariu/parallel-monte-carlo-simulations#egg=parallel_simulations"
 ```
 ### Importing the ParallelMCBattery class to parallelize Monte Carlo simulations
 ```python
