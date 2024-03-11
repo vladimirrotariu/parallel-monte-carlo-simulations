@@ -1,5 +1,4 @@
 import os
-import csv
 import logging
 
 import numpy as np
@@ -9,6 +8,7 @@ from pydantic import validator, ValidationError
 from typing import Any
 
 from models import BatteryConfigs, SimulationConfigs, OutputPath
+from utils import choose_unique_random_seeds, WriteMCTrajectoriesToCsvDoFn
 
 
 class ParallelMCBattery:
@@ -41,7 +41,7 @@ class ParallelMCBattery:
 
         ParallelMCBattery.output_paths = output_paths
 
-        index_seeds = [i for i in range(orchestration_dimension)]
+        index_seeds = choose_unique_random_seeds(orchestration_dimension)
 
         input_collection = list(
             zip(
@@ -93,22 +93,13 @@ class ParallelMCBattery:
                     monte_carlo_traces.append(monte_carlo_trace)
                 yield (monte_carlo_traces, output_path)
 
-        class WriteToCsvDoFn(beam.DoFn):
-            def process(self, element):
-                simulations, output_path = element
-
-                with open(output_path, "w") as file:
-                    writer = csv.writer(file)
-
-                    for simulation in simulations:
-                        writer.writerow(simulation)
-
         with beam.Pipeline(options=ParallelMCBattery.pipeline_options) as pipeline:
             (
                 pipeline
                 | "Initialize models workbench..." >> beam.Create(input_collection)
                 | "Generate Monte Carlo simulations" >> beam.ParDo(SimulateDoFn())
-                | "Write simulations to output files" >> beam.ParDo(WriteToCsvDoFn())
+                | "Write simulations to output files"
+                >> beam.ParDo(WriteMCTrajectoriesToCsvDoFn())
             )
 
         logging.info("The Monte Carlo simulations completed succesfully.")
