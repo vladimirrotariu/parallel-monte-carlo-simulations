@@ -25,5 +25,4 @@ setup(
     ],
     python_requires=">=3.8",
     packages=find_packages(),
-    package_dir={"": "parallel_simulations"},
 )
